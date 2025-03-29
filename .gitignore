@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+
+# Ruby
+*.gem
+*.rbc
+.bundle
+.config
+.yardoc
+_yardoc
+coverage/
+InstalledFiles
+lib/bundler/man/
+pkg/
+spec/reports/
+test/tmp/
+test/version_tmp/
+tmp/
+vendor/
+log/
+
+# Byebug history
+.byebug_history
+
+# IRB history
+.irb-history
+
+# Rubocop
+.rubocop-*
+
+# RSpec
+.rspec
+
+# Others
+*.swp
+*.swo
+*~
