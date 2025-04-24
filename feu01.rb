@@ -8,25 +8,24 @@
 # ===========================================
 
 # --------------------------
-# Helpers
+# Argument & Input Handling
 # --------------------------
 
-def is_digit?(character)
-  character >= '0' && character <= '9'
+def validate_arguments(arguments)
+  return false unless arguments.length == 1
+  true
 end
 
-def is_number_token?(token)
-  return false if token.nil? || token.empty?
+def read_expression(arguments)
+  arguments[0]
+end
 
-  start_index = 0
-  start_index = 1 if token[0] == '-'
+# --------------------------
+# Tokenizer
+# --------------------------
 
-  i = start_index
-  while i < token.length
-    return false unless is_digit?(token[i])
-    i += 1
-  end
-  true
+def is_digit?(char)
+  char >= '0' && char <= '9'
 end
 
 def get_priority(operator)
@@ -42,20 +41,71 @@ def get_priority(operator)
   end
 end
 
-def string_to_number(string)
-  return 0 if string == "0" || string == "-0"
+def tokenizer(expression)
+  tokens = []
+  token = +''
+  i = 0
+
+  while i < expression.length
+    char = expression[i]
+
+    if is_digit?(char)
+      token << char
+    elsif char == '-'
+      if token.empty? && (tokens.empty? || tokens[-1] == '(' || get_priority(tokens[-1]) > 0)
+        token << char
+      else
+        tokens << token unless token.empty?
+        token = +''
+        tokens << char
+      end
+    elsif char == ' '
+      unless token.empty?
+        tokens << token
+        token = +''
+      end
+    elsif get_priority(char) >= 0
+      tokens << token unless token.empty?
+      token = +''
+      tokens << char
+    else
+      return nil
+    end
+
+    i += 1
+  end
+
+  tokens << token unless token.empty?
+  tokens
+end
+
+# --------------------------
+# Helpers
+# --------------------------
+
+def is_number_token?(token)
+  return false if token.nil? || token.empty?
+  start_index = (token[0] == '-') ? 1 : 0
+
+  i = start_index
+  while i < token.length
+    return false unless is_digit?(token[i])
+    i += 1
+  end
+  true
+end
+
+def string_to_number(str)
+  return 0 if str == "0" || str == "-0"
 
   i = 0
   is_negative = false
-
-  if string[0] == '-'
-    is_negative = true
-    i = 1
-  end
+  is_negative = true if str[0] == '-'
+  i += 1 if is_negative
 
   result = 0
-  while i < string.length
-    digit = string[i].ord - '0'.ord
+  while i < str.length
+    digit = str[i].ord - '0'.ord
     result = result * 10 + digit
     i += 1
   end
@@ -67,60 +117,100 @@ def number_to_string(number)
   return "0" if number == 0
 
   is_negative = false
-  if number < 0
-    is_negative = true
-    number = -number
-  end
+  is_negative = true if number < 0
+  number = -number if is_negative
 
-  digits = ""
+  digits = ''
   while number > 0
     digit = number % 10
-    character = (digit + '0'.ord).chr
-
-    new_digits = +character
-    i = 0
-    while i < digits.length
-      new_digits << digits[i]
-      i += 1
-    end
-    digits = new_digits
+    digits = (digit + '0'.ord).chr + digits
     number /= 10
   end
 
-  is_negative ? "-" + digits : digits
+  is_negative ? '-' + digits : digits
+end
+
+def is_operator(token)
+  ['+', '-', '*', '/', '%'].include?(token)
+end
+
+# --------------------------
+# Input Validation
+# --------------------------
+
+def valid_input?(expression)
+  return false if expression.nil?
+
+  opened = 0
+  closed = 0
+  i = 0
+  while i < expression.length
+    opened += 1 if expression[i] == '('
+    closed += 1 if expression[i] == ')'
+    i += 1
+  end
+  return false if opened != closed
+
+  i = 0
+  while i < expression.length
+    return true if expression[i] != ' '
+    i += 1
+  end
+
+  false
+end
+
+def valid_token_sequence?(tokens)
+  return false unless is_number_token?(tokens[0]) || tokens[0] == '(' || (tokens[0][0] == '-' && is_number_token?(tokens[0]))
+  return false unless is_number_token?(tokens[-1]) || tokens[-1] == ')'
+
+  has_number = false
+  i = 0
+  while i < tokens.length
+    token = tokens[i]
+    has_number = true if is_number_token?(token)
+
+    if is_operator(token)
+      return false if i == 0 || i == tokens.length - 1
+      prev = tokens[i - 1]
+      nxt = tokens[i + 1]
+      return false unless is_number_token?(prev) || prev == ')'
+      return false unless is_number_token?(nxt) || nxt == '(' || nxt[0] == '-'
+    end
+
+    i += 1
+  end
+
+  has_number
 end
 
 # --------------------------
 # Evaluators
 # --------------------------
 
-def evaluate_simple(left_operand, operator, right_operand)
-  left = string_to_number(left_operand)
-  right = string_to_number(right_operand)
+def evaluate_simple(left, operator, right)
+  a = string_to_number(left)
+  b = string_to_number(right)
 
-  if (operator == '/' || operator == '%') && right == 0
-    raise 'Error: division by zero'
-  end
+  raise 'Error: division by zero' if (operator == '/' || operator == '%') && b == 0
 
   case operator
-  when '+' then left + right
-  when '-' then left - right
-  when '*' then left * right
-  when '/' then left / right
-  when '%' then left % right
+  when '+' then a + b
+  when '-' then a - b
+  when '*' then a * b
+  when '/' then a / b
+  when '%' then a % b
   end
 end
 
 def evaluate_flat_expression(tokens)
   tokens = tokens.dup
 
+  # Priority 2: *, /, %
   i = 0
   while i < tokens.length
     if get_priority(tokens[i]) == 2
-      left_operand = tokens[i - 1]
-      operator = tokens[i]
-      right_operand = tokens[i + 1]
-      result = evaluate_simple(left_operand, operator, right_operand)
+      result = evaluate_simple(tokens[i - 1], tokens[i], tokens[i + 1])
       tokens[i - 1..i + 1] = [number_to_string(result)]
       i = 0
     else
@@ -128,13 +218,11 @@ def evaluate_flat_expression(tokens)
     end
   end
 
+  # Priority 1: +, -
   i = 0
   while i < tokens.length
     if get_priority(tokens[i]) == 1
-      left_operand = tokens[i - 1]
-      operator = tokens[i]
-      right_operand = tokens[i + 1]
-      result = evaluate_simple(left_operand, operator, right_operand)
+      result = evaluate_simple(tokens[i - 1], tokens[i], tokens[i + 1])
       tokens[i - 1..i + 1] = [number_to_string(result)]
       i = 0
     else
@@ -150,135 +238,47 @@ def evaluate_expression(tokens)
   while i < tokens.length
     if tokens[i] == ')'
       open_index = i - 1
-      while tokens[open_index] != '('
-        open_index -= 1
-      end
-      sub_expression = tokens[open_index + 1...i]
-      result = evaluate_expression(sub_expression)
+      open_index -= 1 while tokens[open_index] != '('
+      inner = tokens[open_index + 1...i]
+      result = evaluate_expression(inner)
       tokens[open_index..i] = [result]
       i = open_index
     end
     i += 1
   end
+
   evaluate_flat_expression(tokens)
 end
 
 # --------------------------
-# Tokenizer
-# --------------------------
-
-def tokenizer(expression)
-  tokens = []
-  token = +''
-  i = 0
-  while i < expression.length
-    character = expression[i]
-
-    if is_digit?(character)
-      token << character
-    elsif character == '-'
-      if token.empty? && (tokens.empty? || tokens[-1] == '(' || get_priority(tokens[-1]) > 0)
-        token << character
-      else
-        tokens << token unless token.empty?
-        token = +''
-        tokens << character
-      end
-    elsif character == ' '
-      unless token.empty?
-        tokens << token
-        token = +''
-      end
-    elsif get_priority(character) >= 0
-      tokens << token unless token.empty?
-      token = +''
-      tokens << character
-    else
-      return nil
-    end
-
-    i += 1
-  end
-  tokens << token unless token.empty?
-  tokens
-end
-
-# --------------------------
-# Input validation
-# --------------------------
-
-def valid_input?(expression)
-  return false if expression == nil
-
-  opened_parenthesis = 0
-  closed_parenthesis = 0
-  i = 0
-  while i < expression.length
-    opened_parenthesis += 1 if expression[i] == '('
-    closed_parenthesis += 1 if expression[i] == ')'
-    i += 1
-  end
-  return false if opened_parenthesis != closed_parenthesis
-
-  i = 0
-  while i < expression.length
-    return true if expression[i] != ' '
-    i += 1
-  end
-  false
-end
-
-def is_operator(token)
-  token == '+' || token == '-' || token == '*' || token == '/' || token == '%'
-end
-
-def valid_token_sequence?(tokens)
-  return false unless is_number_token?(tokens[0]) || tokens[0] == '(' || (tokens[0][0] == '-' && is_number_token?(tokens[0]))
-  return false unless is_number_token?(tokens[-1]) || tokens[-1] == ')'
-
-  has_number = false
-  i = 0
-  while i < tokens.length
-    token = tokens[i]
-    has_number = true if is_number_token?(token)
-
-    if is_operator(token)
-      return false if i == 0 || i == tokens.length - 1
-      previous_token = tokens[i - 1]
-      next_token = tokens[i + 1]
-      return false unless is_number_token?(previous_token) || previous_token == ')'
-      return false unless is_number_token?(next_token) || next_token == '(' || next_token[0] == '-'
-    end
-    i += 1
-  end
-
-  has_number
-end
-
-# --------------------------
-# Program execution
+# Program Execution
 # --------------------------
 
 def main
-  expression = ARGV[0]
+  unless validate_arguments(ARGV)
+    puts 'error: 1 argument expected'
+    return
+  end
+
+  expression = read_expression(ARGV)
 
   unless valid_input?(expression)
-    puts "Error: invalid input"
+    puts 'error: invalid expression format'
     return
   end
 
   tokens = tokenizer(expression)
-  if tokens == nil || !valid_token_sequence?(tokens)
-    puts "Error: invalid token sequence"
+
+  if tokens.nil? || !valid_token_sequence?(tokens)
+    puts 'error: invalid token sequence'
     return
   end
 
   begin
     result = evaluate_expression(tokens)
     puts result
-  rescue => error
-    puts error.message
-    return
+  rescue => e
+    puts "error: #{e.message}"
   end
 end
 
