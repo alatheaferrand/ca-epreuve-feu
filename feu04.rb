@@ -10,9 +10,9 @@
 # Argument & File Handling
 # --------------------------
 
-def validate_arguments(args)
-  return false unless args.length == 1
-  file_path = args[0]
+def validate_arguments(arguments)
+  return false unless arguments.length == 1
+  file_path = arguments[0]
   return false unless File.exist?(file_path)
   return false unless File.readable?(file_path)
   return false if File.zero?(file_path)
