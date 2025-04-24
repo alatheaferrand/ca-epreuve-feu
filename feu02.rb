@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 
 # ===========================================
-# Find a shape
-# Displays the top-left position of a shape inside a board, if found
+# Shape Finder
+# Finds the top-left position of a shape inside a board
 # Supports minimal file parsing, shape matching, and structured output
 # ===========================================
 
 # --------------------------
-# Input Validation
+# Argument & File Handling
 # --------------------------
 
 def validate_arguments(arguments)
@@ -20,109 +20,82 @@ def validate_arguments(arguments)
   true
 end
 
-# --------------------------
-# File & Matrix Parsers
-# --------------------------
-
-def read_file(file_path)
-  content = []
-  File.open(file_path, 'r') do |file|
+def read_file(path)
+  lines = []
+  File.open(path, 'r') do |file|
     while (line = file.gets)
-      content << (line[-1] == "\n" ? line[0..-2] : line)
+      lines << line.chomp
     end
   end
-  content
+  lines
 end
 
-def to_char_matrix(lines)
-  matrix = []
-  i = 0
-  while i < lines.length
-    row = []
-    j = 0
-    while j < lines[i].length
-      row << lines[i][j]
-      j += 1
-    end
-    matrix << row
-    i += 1
+# --------------------------
+# Grid Conversion
+# --------------------------
+
+def to_grid(lines)
+  grid = []
+  lines.each do |line|
+    grid << line.chars
   end
-  matrix
+  grid
 end
 
 # --------------------------
 # Shape Matching Logic
 # --------------------------
 
-def shape_fits?(board, shape, start_row, start_column)
-  return false if start_row + shape.length > board.length
-  return false if start_column + shape[0].length > board[0].length
+def shape_fits?(board, shape, row, col)
+  return false if row + shape.length > board.length
+  return false if col + shape[0].length > board[0].length
   true
 end
 
-def shape_matches_at?(board, shape, start_row, start_column)
-  i = 0
-  while i < shape.length
-    j = 0
-    while j < shape[i].length
-      if shape[i][j] != ' '
-        return false if board[start_row + i][start_column + j] != shape[i][j]
-      end
-      j += 1
+def shape_matches_at?(board, shape, row, col)
+  shape.each_with_index do |shape_row, i|
+    shape_row.each_with_index do |char, j|
+      next if char == ' '
+      return false if board[row + i][col + j] != char
     end
-    i += 1
   end
   true
 end
 
 def find_shape(board, shape)
-  row = 0
-  while row < board.length
-    column = 0
-    while column < board[0].length
-      if shape_fits?(board, shape, row, column) && shape_matches_at?(board, shape, row, column)
+  (0...board.length).each do |row|
+    (0...board[0].length).each do |col|
+      if shape_fits?(board, shape, row, col) && shape_matches_at?(board, shape, row, col)
         puts "Found !"
-        puts "Coordinates : #{column},#{row}"
-        display_shape(shape, column, row, board[0].length)
+        puts "Coordinates : #{col},#{row}"
+        display_shape(shape, col, row, board[0].length)
         return
       end
-      column += 1
     end
-    row += 1
   end
   puts "Not found"
 end
 
 # --------------------------
-# Display
+# Grid Display
 # --------------------------
 
 def display_shape(shape, offset_x, offset_y, board_width)
-  # Top padding
-  k = 0
-  while k < offset_y
-    puts "-" * board_width
-    k += 1
-  end
+  offset_y.times { puts '-' * board_width }
 
-  # Shape lines
-  i = 0
-  while i < shape.length
-    line = ""
-    j = 0
-    while j < board_width
-      if j < offset_x
-        line += "-"
-      elsif j - offset_x < shape[i].length
-        char = shape[i][j - offset_x]
-        line += (char == " " ? "-" : char)
+  shape.each do |row|
+    line = ''
+    (0...board_width).each do |col|
+      if col < offset_x
+        line << '-'
+      elsif (col - offset_x) < row.length
+        char = row[col - offset_x]
+        line << (char == ' ' ? '-' : char)
       else
-        line += "-"
+        line << '-'
       end
-      j += 1
     end
     puts line
-    i += 1
   end
 end
 
@@ -131,13 +104,16 @@ end
 # --------------------------
 
 def main
-  return puts "Error: invalid arguments" unless validate_arguments(ARGV)
+  unless validate_arguments(ARGV)
+    puts 'error: invalid arguments'
+    return
+  end
 
   board_lines = read_file(ARGV[0])
   shape_lines = read_file(ARGV[1])
 
-  board = to_char_matrix(board_lines)
-  shape = to_char_matrix(shape_lines)
+  board = to_grid(board_lines)
+  shape = to_grid(shape_lines)
 
   find_shape(board, shape)
 end
