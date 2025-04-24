@@ -3,11 +3,11 @@
 # ===========================================
 # Sudoku Solver
 # Solves and prints the solution of a Sudoku grid from a file
-# Clean structure: argument validation, parsing, logic, display
+# Structured: argument validation, parsing, solving, display
 # ===========================================
 
 # --------------------------
-# Input Validation
+# Argument & File Handling
 # --------------------------
 
 def validate_arguments(arguments)
@@ -19,105 +19,83 @@ def validate_arguments(arguments)
   true
 end
 
-# --------------------------
-# File & Grid Parsing
-# --------------------------
-
-def read_file(file_path)
-  content = []
-  File.open(file_path, 'r') do |file|
+def read_file(path)
+  lines = []
+  File.open(path, 'r') do |file|
     while (line = file.gets)
-      content << (line[-1] == "\n" ? line[0..-2] : line)
+      lines << line.chomp
     end
   end
-  content
+  lines
 end
+
+# --------------------------
+# Grid Conversion
+# --------------------------
 
 def to_grid(lines)
-  matrix = []
-  i = 0
-  while i < lines.length
-    row = []
-    j = 0
-    while j < lines[i].length
-      char = lines[i][j]
-      row << (char == '.' ? nil : char.to_i)
-      j += 1
-    end
-    matrix << row
-    i += 1
+  grid = []
+  lines.each do |line|
+    row = line.chars.map { |c| c == '.' ? nil : c.to_i }
+    grid << row
   end
-  matrix
+  grid
 end
 
 # --------------------------
-# Sudoku Logic
+# Sudoku Solving Logic
 # --------------------------
 
-def get_row(n, grid)
-  grid[n]
+def get_row(row_index, grid)
+  grid[row_index]
 end
 
-def get_column(n, grid)
-  result = []
-  i = 0
-  while i < 9
-    result << grid[i][n]
-    i += 1
-  end
-  result
+def get_column(col_index, grid)
+  grid.map { |row| row[col_index] }
 end
 
-def get_block(column, row, grid)
-  result = []
-  block_column_start = (column / 3) * 3
-  block_row_start = (row / 3) * 3
-  i = 0
-  while i < 3
-    j = 0
-    while j < 3
-      result << grid[block_row_start + i][block_column_start + j]
-      j += 1
+def get_block(col, row, grid)
+  block = []
+  start_row = (row / 3) * 3
+  start_col = (col / 3) * 3
+
+  (0...3).each do |i|
+    (0...3).each do |j|
+      block << grid[start_row + i][start_col + j]
     end
-    i += 1
   end
-  result
+
+  block
 end
 
-def can_place?(row, col, n, grid)
-  return false if get_row(row, grid).include?(n)
-  return false if get_column(col, grid).include?(n)
-  return false if get_block(col, row, grid).include?(n)
-  true
+def can_place?(row, col, num, grid)
+  !get_row(row, grid).include?(num) &&
+    !get_column(col, grid).include?(num) &&
+    !get_block(col, row, grid).include?(num)
 end
 
 def find_empty_cell(grid)
-  row = 0
-  while row < 9
-    col = 0
-    while col < 9
+  (0...9).each do |row|
+    (0...9).each do |col|
       return [row, col] if grid[row][col].nil?
-      col += 1
     end
-    row += 1
   end
   nil
 end
 
 def solve(grid)
-  position = find_empty_cell(grid)
-  return true if position.nil?
+  cell = find_empty_cell(grid)
+  return true if cell.nil?
 
-  row, col = position
-  n = 1
-  while n <= 9
+  row, col = cell
+  (1..9).each do |n|
     if can_place?(row, col, n, grid)
       grid[row][col] = n
       return true if solve(grid)
       grid[row][col] = nil
     end
-    n += 1
   end
+
   false
 end
 
@@ -127,7 +105,7 @@ end
 
 def main
   unless validate_arguments(ARGV)
-    puts 'error'
+    puts 'error: invalid arguments'
     return
   end
 
@@ -137,7 +115,7 @@ def main
   if solve(grid)
     grid.each { |row| puts row.join }
   else
-    puts 'error'
+    puts 'error: no solution'
   end
 end
 
